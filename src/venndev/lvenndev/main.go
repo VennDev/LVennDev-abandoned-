@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"net/url"
 	"os"
 	"strconv"
@@ -105,7 +104,7 @@ func main() {
 	// Hyperlink
 	githubUrl, err := url.Parse(github)
 	if err != nil {
-		fmt.Println("Error parsing GitHub URL:", err)
+		dialog.ShowInformation("Error", "Error parsing GitHub URL:"+err.Error(), myWindow)
 		return
 	}
 
