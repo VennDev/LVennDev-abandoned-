@@ -88,6 +88,11 @@ func main() {
 	// Check if VSCode is installed
 	hasVSCode = utils.CheckVSCode()
 
+	// Search Bar
+	searchBar := widget.NewEntry()
+	searchBar.SetPlaceHolder("Search...")
+	searchBarContainer := container.NewGridWrap(fyne.NewSize(200, 40), searchBar)
+
 	// Buttons
 	label := widget.NewLabel("VSCode: " + strconv.FormatBool(hasVSCode))
 	label.Alignment = fyne.TextAlignCenter
@@ -112,7 +117,6 @@ func main() {
 		dialog.ShowInformation("Error", "Error parsing GitHub URL:"+err.Error(), myWindow)
 		return
 	}
-
 	githubUrlHyperlink := widget.NewHyperlink("Github: VennDev", githubUrl)
 	hyperlinkContainer := container.New(layout.NewHBoxLayout(), layout.NewSpacer(), githubUrlHyperlink)
 
@@ -132,8 +136,11 @@ func main() {
 	)
 
 	// Content
-	content := container.New(
-		layout.NewStackLayout(),
+	content := container.NewBorder(
+		container.NewCenter(searchBarContainer),
+		nil,
+		nil,
+		nil,
 		background,
 		container.NewBorder(
 			nil,
