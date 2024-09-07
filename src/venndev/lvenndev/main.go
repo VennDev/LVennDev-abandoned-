@@ -36,7 +36,12 @@ var (
 func about(window fyne.Window) {
 	dialog.ShowInformation(
 		"About",
-		"Version: "+version+"\nAuthor: "+author+"\nEmail: "+email+"\nGithub: "+github,
+		`
+		Version: `+version+`
+		Author: `+author+`
+		Email: `+email+`
+		Github: `+github+`
+		`,
 		window,
 	)
 }
