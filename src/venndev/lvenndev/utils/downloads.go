@@ -2,52 +2,56 @@ package utils
 
 import (
 	"io"
-	"net/http"
-	"os"
-	"strconv"
+	"sync"
 
+	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
+	"github.com/hashicorp/go-getter"
 )
 
-func DownloadFile(url, dest string, progressBar *widget.ProgressBar) error {
-	resp, err := http.Get(url)
+type ProgressTracker struct {
+	ProgressBar *widget.ProgressBar
+	totalSize   int64
+	downloaded  int64
+}
+
+func (pt *ProgressTracker) TrackProgress(src string, currentSize, totalSize int64, stream io.ReadCloser) io.ReadCloser {
+	pt.totalSize = totalSize
+	return &progressReader{ReadCloser: stream, tracker: pt}
+}
+
+type progressReader struct {
+	io.ReadCloser
+	tracker *ProgressTracker
+}
+
+func (pr *progressReader) Read(p []byte) (int, error) {
+	n, err := pr.ReadCloser.Read(p)
+	if n > 0 {
+		pr.tracker.downloaded += int64(n)
+		pr.tracker.ProgressBar.SetValue(float64(pr.tracker.downloaded) / float64(pr.tracker.totalSize))
+	}
+	return n, err
+}
+
+func DownloadFile(url string, dst string, progressBar *widget.ProgressBar, myWindow fyne.Window, wg *sync.WaitGroup) {
+	tracker := &ProgressTracker{ProgressBar: progressBar}
+	client := &getter.Client{
+		Src:              url,
+		Dst:              dst,
+		Mode:             getter.ClientModeFile,
+		ProgressListener: tracker,
+	}
+	err := client.Get()
 	if err != nil {
-		return err
+		dialog.ShowError(err, myWindow)
 	}
-	defer resp.Body.Close()
+	wg.Done()
+}
 
-	out, err := os.Create(dest)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	totalSize, err := strconv.Atoi(resp.Header.Get("Content-Length"))
-	if err != nil {
-		return err
-	}
-
-	var downloadedSize int64
-
-	buffer := make([]byte, 1024)
-	for {
-		n, err := resp.Body.Read(buffer)
-		if n > 0 {
-			_, err := out.Write(buffer[:n])
-			if err != nil {
-				return err
-			}
-			downloadedSize += int64(n)
-			progressBar.SetValue(float64(downloadedSize) / float64(totalSize))
-		}
-
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return err
-		}
-	}
-
-	return nil
+func DownloadFileAndRun(url string, dst string, progressBar *widget.ProgressBar, myWindow fyne.Window, wg *sync.WaitGroup) {
+	DownloadFile(url, dst, progressBar, myWindow, wg)
+	wg.Wait()
+	RunCommand(dst)
 }

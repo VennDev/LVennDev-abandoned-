@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"sync"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -19,16 +20,18 @@ import (
 const (
 	title           = "Libraries VennDev"
 	imageBackground = "./images/back-ground.jpg"
-	icon            = "./images/icon/icon.ico"
+	icon            = "./images/icon/icon.jpg"
 	github          = "https://github.com/VennDev"
 	version         = "1.0.0"
 	author          = "VennDev"
 	email           = "venndev@gmail.com"
+	downloadPath    = "./downloads"
 )
 
 var (
 	menu        *fyne.MainMenu
 	hasVSCode   bool = false
+	hasGoogle   bool = false
 	progressBar *widget.ProgressBar
 	buttonScale = fyne.NewSize(80, 30)
 )
@@ -37,10 +40,10 @@ func about(window fyne.Window) {
 	dialog.ShowInformation(
 		"About",
 		`
-		Version: `+version+`
-		Author: `+author+`
-		Email: `+email+`
-		Github: `+github+`
+Version: `+version+`
+Author: `+author+`
+Email: `+email+`
+Github: `+github+`
 		`,
 		window,
 	)
@@ -63,6 +66,7 @@ func checkFiles() bool {
 }
 
 func main() {
+	wg := sync.WaitGroup{}
 	myApp := app.New()
 	myApp.Settings().SetTheme(theme.VTheme{})
 	myWindow := myApp.NewWindow(title)
@@ -71,6 +75,11 @@ func main() {
 	// Check if the files exist
 	if !checkFiles() {
 		return
+	}
+
+	// Check path download
+	if _, err := os.Stat(downloadPath); os.IsNotExist(err) {
+		os.Mkdir(downloadPath, os.ModePerm)
 	}
 
 	// Progress Bar
@@ -88,28 +97,45 @@ func main() {
 	// Check if VSCode is installed
 	hasVSCode = utils.CheckVSCode()
 
+	// Check if Google Chrome is installed
+	hasGoogle = utils.CheckGoogleHasDownloaded()
+
 	// Search Bar
 	searchBar := widget.NewEntry()
 	searchBar.SetPlaceHolder("Search...")
 	searchBarContainer := container.NewGridWrap(fyne.NewSize(200, 40), searchBar)
 
 	// Buttons
-	label := widget.NewLabel("VSCode: " + strconv.FormatBool(hasVSCode))
-	label.Alignment = fyne.TextAlignCenter
-	label.TextStyle = fyne.TextStyle{Bold: true}
+	labelVSCode := widget.NewLabel("VSCode: " + strconv.FormatBool(hasVSCode))
+	labelVSCode.Alignment = fyne.TextAlignCenter
+	labelVSCode.TextStyle = fyne.TextStyle{Bold: true}
 	buttonVSCode := widget.NewButton("Download", func() {
 		if !hasVSCode {
-			urlDownload := "https://code.visualstudio.com/sha/download?build=stable&os=win32-x64-user"
-			err := utils.DownloadFile(urlDownload, "vscode_installer.exe", progressBar)
-			if err != nil {
-				dialog.ShowError(err, myWindow)
-			}
+			dst := downloadPath + "/vscode_installer.exe"
+			wg.Add(1)
+			go utils.DownloadFileAndRun(utils.ChromeUrl, dst, progressBar, myWindow, &wg)
 		} else {
 			dialog.ShowInformation("VSCode", "VSCode is already installed!", myWindow)
 		}
 	})
 	buttonVSCode.Importance = widget.HighImportance
-	buttonContainer := container.New(layout.NewGridWrapLayout(buttonScale), buttonVSCode)
+
+	labelGoogle := widget.NewLabel("Google Chrome: " + strconv.FormatBool(hasGoogle))
+	labelGoogle.Alignment = fyne.TextAlignCenter
+	labelGoogle.TextStyle = fyne.TextStyle{Bold: true}
+	buttonGoogle := widget.NewButton("Download", func() {
+		if !hasGoogle {
+			dst := downloadPath + "/chrome_installer.exe"
+			wg.Add(1)
+			go utils.DownloadFileAndRun(utils.VscodeUrl, dst, progressBar, myWindow, &wg)
+		} else {
+			dialog.ShowInformation("Google Chrome", "Google Chrome is already installed!", myWindow)
+		}
+	})
+	buttonGoogle.Importance = widget.HighImportance
+
+	buttonContainerRight := container.New(layout.NewGridWrapLayout(buttonScale), buttonVSCode)
+	buttonContainerLeft := container.New(layout.NewGridWrapLayout(buttonScale), buttonGoogle)
 
 	// Hyperlink
 	githubUrl, err := url.Parse(github)
@@ -127,12 +153,12 @@ func main() {
 
 	// Main Content
 	mainContentRight := container.NewHBox(
-		label,
-		buttonContainer,
+		labelVSCode,
+		buttonContainerRight,
 	)
 	mainContentLeft := container.NewHBox(
-		label,
-		buttonContainer,
+		labelGoogle,
+		buttonContainerLeft,
 	)
 
 	// Content
@@ -143,7 +169,7 @@ func main() {
 		nil,
 		background,
 		container.NewBorder(
-			nil,
+			progressBar,
 			hyperlinkContainer,
 			mainContentLeft,
 			mainContentRight,
@@ -157,7 +183,9 @@ func main() {
 	myWindow.SetMainMenu(menu)
 
 	// Set Icon
-	myWindow.SetIcon(canvas.NewImageFromFile(icon).Resource)
+	if iconResource, err := utils.LoadResourceFromPath(icon); err == nil {
+		myWindow.SetIcon(iconResource)
+	}
 
 	// Show and Run
 	myWindow.ShowAndRun()
