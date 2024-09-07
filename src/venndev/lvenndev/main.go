@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/url"
 	"os"
-	"os/exec"
 	"strconv"
 
 	"fyne.io/fyne/v2"
@@ -14,29 +13,33 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
-
+	"github.com/venndev/LVennDev/src/venndev/lvenndev/theme"
 	"github.com/venndev/LVennDev/src/venndev/lvenndev/utils"
 )
 
 const (
+	title           = "Libraries VennDev"
 	imageBackground = "./images/back-ground.jpg"
 	icon            = "./images/icon/icon.ico"
 	github          = "https://github.com/VennDev"
+	version         = "1.0.0"
+	author          = "VennDev"
+	email           = "venndev@gmail.com"
 )
 
 var (
 	menu        *fyne.MainMenu
 	hasVSCode   bool = false
 	progressBar *widget.ProgressBar
+	buttonScale = fyne.NewSize(80, 30)
 )
 
-func checkVSCode() bool {
-	_, err := exec.LookPath("code")
-	if err != nil {
-		fmt.Println("VSCode is not installed")
-		return false
-	}
-	return true
+func about(window fyne.Window) {
+	dialog.ShowInformation(
+		"About",
+		"Version: "+version+"\nAuthor: "+author+"\nEmail: "+email+"\nGithub: "+github,
+		window,
+	)
 }
 
 func checkFiles() bool {
@@ -57,7 +60,8 @@ func checkFiles() bool {
 
 func main() {
 	myApp := app.New()
-	myWindow := myApp.NewWindow("Libraries VennDev")
+	myApp.Settings().SetTheme(theme.VTheme{})
+	myWindow := myApp.NewWindow(title)
 	myWindow.Resize(fyne.NewSize(1000, 600))
 
 	// Check if the files exist
@@ -72,21 +76,19 @@ func main() {
 	menu = fyne.NewMainMenu(
 		fyne.NewMenu("File",
 			fyne.NewMenuItem("About", func() {
-				dialog.ShowInformation(
-					"About",
-					"Version: 1.0.0\nAuthor: VennDev\nEmail: venndev@gmail.com",
-					myWindow,
-				)
+				about(myWindow)
 			}),
 		),
 	)
 
 	// Check if VSCode is installed
-	hasVSCode = checkVSCode()
+	hasVSCode = utils.CheckVSCode()
 
 	// Buttons
 	label := widget.NewLabel("VSCode: " + strconv.FormatBool(hasVSCode))
-	buttonVSCode := widget.NewButton("Click to download!", func() {
+	label.Alignment = fyne.TextAlignCenter
+	label.TextStyle = fyne.TextStyle{Bold: true}
+	buttonVSCode := widget.NewButton("Download", func() {
 		if !hasVSCode {
 			urlDownload := "https://code.visualstudio.com/sha/download?build=stable&os=win32-x64-user"
 			err := utils.DownloadFile(urlDownload, "vscode_installer.exe", progressBar)
@@ -97,8 +99,8 @@ func main() {
 			dialog.ShowInformation("VSCode", "VSCode is already installed!", myWindow)
 		}
 	})
-
-	buttonContainer := container.New(layout.NewGridWrapLayout(fyne.NewSize(150, 50)), buttonVSCode)
+	buttonVSCode.Importance = widget.HighImportance
+	buttonContainer := container.New(layout.NewGridWrapLayout(buttonScale), buttonVSCode)
 
 	// Hyperlink
 	githubUrl, err := url.Parse(github)
@@ -113,16 +115,28 @@ func main() {
 	// Background
 	background := canvas.NewImageFromFile(imageBackground)
 	background.FillMode = canvas.ImageFillStretch
+	background.SetMinSize(fyne.NewSize(1000, 600))
 
 	// Main Content
-	mainContent := container.NewVBox(
+	mainContentRight := container.NewHBox(
+		label,
+		buttonContainer,
+	)
+	mainContentLeft := container.NewHBox(
 		label,
 		buttonContainer,
 	)
 
 	// Content
-	content := container.NewBorder(nil, hyperlinkContainer, nil, nil,
-		container.NewStack(background, mainContent),
+	content := container.New(
+		layout.NewStackLayout(),
+		background,
+		container.NewBorder(
+			nil,
+			hyperlinkContainer,
+			mainContentLeft,
+			mainContentRight,
+		),
 	)
 
 	// Set Content
