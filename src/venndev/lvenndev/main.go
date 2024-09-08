@@ -65,6 +65,59 @@ func checkFiles() bool {
 	return true
 }
 
+func getToggles() (toggleVSCode *compons.CustomCheck, toggleGoogle *compons.CustomCheck) {
+	// Check if VSCode is installed
+	hasVSCode = utils.CheckVSCode()
+	toggleVSCode = compons.NewCustomCheck("VSCode", nil)
+	toggleVSCode.SetChecked(hasVSCode)
+	toggleVSCode.OnChanged = func(checked bool) {
+		if checked {
+			toggleVSCode.Enable()
+		}
+	}
+
+	// Check if Google Chrome is installed
+	hasGoogle = utils.CheckGoogleHasDownloaded()
+	toggleGoogle = compons.NewCustomCheck("Google Chrome", nil)
+	toggleGoogle.SetChecked(hasGoogle)
+	toggleGoogle.OnChanged = func(checked bool) {
+		if checked {
+			toggleGoogle.Enable()
+		}
+	}
+
+	return toggleVSCode, toggleGoogle
+}
+
+func getButtons(window fyne.Window, wg *sync.WaitGroup) (ButtonRight *fyne.Container, ButtonLeft *fyne.Container) {
+	buttonVSCode := widget.NewButton("Download", func() {
+		if !hasVSCode {
+			dst := downloadPath + "/vscode_installer.exe"
+			wg.Add(1)
+			go utils.DownloadFileAndRun(utils.VscodeUrl, dst, progressBar, window, wg)
+		} else {
+			dialog.ShowInformation("VSCode", "VSCode is already installed!", window)
+		}
+	})
+	buttonVSCode.Importance = widget.HighImportance
+
+	buttonGoogle := widget.NewButton("Download", func() {
+		if !hasGoogle {
+			dst := downloadPath + "/chrome_installer.exe"
+			wg.Add(1)
+			go utils.DownloadFileAndRun(utils.ChromeUrl, dst, progressBar, window, wg)
+		} else {
+			dialog.ShowInformation("Google Chrome", "Google Chrome is already installed!", window)
+		}
+	})
+	buttonGoogle.Importance = widget.HighImportance
+
+	buttonContainerRight := container.New(layout.NewGridWrapLayout(buttonScale), buttonVSCode)
+	buttonContainerLeft := container.New(layout.NewGridWrapLayout(buttonScale), buttonGoogle)
+
+	return buttonContainerRight, buttonContainerLeft
+}
+
 func main() {
 	wg := sync.WaitGroup{}
 	myApp := app.New()
@@ -94,56 +147,13 @@ func main() {
 		),
 	)
 
-	// Check if VSCode is installed
-	hasVSCode = utils.CheckVSCode()
-	toggleVSCode := compons.NewCustomCheck("VSCode", nil)
-	toggleVSCode.SetChecked(hasVSCode)
-	toggleVSCode.OnChanged = func(checked bool) {
-		if checked {
-			toggleVSCode.Enable()
-		}
-	}
-
-	// Check if Google Chrome is installed
-	hasGoogle = utils.CheckGoogleHasDownloaded()
-	toggleGoogle := compons.NewCustomCheck("Google Chrome", nil)
-	toggleGoogle.SetChecked(hasGoogle)
-	toggleGoogle.OnChanged = func(checked bool) {
-		if checked {
-			toggleGoogle.Enable()
-		}
-	}
+	// Toggles
+	toggleVSCode, toggleGoogle := getToggles()
 
 	// Search Bar
 	searchBar := widget.NewEntry()
 	searchBar.SetPlaceHolder("Search...")
 	searchBarContainer := container.NewGridWrap(fyne.NewSize(200, 40), searchBar)
-
-	// Buttons
-	buttonVSCode := widget.NewButton("Download", func() {
-		if !hasVSCode {
-			dst := downloadPath + "/vscode_installer.exe"
-			wg.Add(1)
-			go utils.DownloadFileAndRun(utils.VscodeUrl, dst, progressBar, myWindow, &wg)
-		} else {
-			dialog.ShowInformation("VSCode", "VSCode is already installed!", myWindow)
-		}
-	})
-	buttonVSCode.Importance = widget.HighImportance
-
-	buttonGoogle := widget.NewButton("Download", func() {
-		if !hasGoogle {
-			dst := downloadPath + "/chrome_installer.exe"
-			wg.Add(1)
-			go utils.DownloadFileAndRun(utils.ChromeUrl, dst, progressBar, myWindow, &wg)
-		} else {
-			dialog.ShowInformation("Google Chrome", "Google Chrome is already installed!", myWindow)
-		}
-	})
-	buttonGoogle.Importance = widget.HighImportance
-
-	buttonContainerRight := container.New(layout.NewGridWrapLayout(buttonScale), buttonVSCode)
-	buttonContainerLeft := container.New(layout.NewGridWrapLayout(buttonScale), buttonGoogle)
 
 	// Hyperlink
 	githubUrl, err := url.Parse(github)
@@ -154,19 +164,32 @@ func main() {
 	githubUrlHyperlink := widget.NewHyperlink("Github: VennDev", githubUrl)
 	hyperlinkContainer := container.New(layout.NewHBoxLayout(), layout.NewSpacer(), githubUrlHyperlink)
 
+	// Buttons
+	buttonContainerRight, buttonContainerLeft := getButtons(myWindow, &wg)
+
 	// Background
 	background := canvas.NewImageFromFile(imageBackground)
 	background.FillMode = canvas.ImageFillStretch
 	background.SetMinSize(fyne.NewSize(1000, 600))
 
 	// Main Content
-	mainContentRight := container.NewVBox(
-		toggleVSCode,
-		buttonContainerRight,
+	mainContentRight := container.NewBorder(
+		nil,
+		nil,
+		container.NewVBox(
+			toggleVSCode,
+			buttonContainerRight,
+		),
+		nil,
 	)
-	mainContentLeft := container.NewVBox(
-		toggleGoogle,
-		buttonContainerLeft,
+	mainContentLeft := container.NewBorder(
+		nil,
+		nil,
+		container.NewVBox(
+			toggleGoogle,
+			buttonContainerLeft,
+		),
+		nil,
 	)
 
 	// Content
