@@ -32,6 +32,7 @@ var (
 	menu        *fyne.MainMenu
 	hasVSCode   bool = false
 	hasGoogle   bool = false
+	hasComposer bool = false
 	progressBar *widget.ProgressBar
 	buttonScale = fyne.NewSize(80, 30)
 )
@@ -65,7 +66,11 @@ func checkFiles() bool {
 	return true
 }
 
-func getToggles() (toggleVSCode *compons.CustomCheck, toggleGoogle *compons.CustomCheck) {
+func getToggles() (
+	toggleVSCode *compons.CustomCheck,
+	toggleGoogle *compons.CustomCheck,
+	toggleComposer *compons.CustomCheck,
+) {
 	// Check if VSCode is installed
 	hasVSCode = utils.CheckVSCode()
 	toggleVSCode = compons.NewCustomCheck("VSCode", nil)
@@ -86,34 +91,53 @@ func getToggles() (toggleVSCode *compons.CustomCheck, toggleGoogle *compons.Cust
 		}
 	}
 
-	return toggleVSCode, toggleGoogle
+	// Check if Composer is installed
+	hasComposer = utils.CheckComposer()
+	toggleComposer = compons.NewCustomCheck("Composer", nil)
+	toggleComposer.SetChecked(hasComposer)
+	toggleComposer.OnChanged = func(checked bool) {
+		if checked {
+			toggleComposer.Enable()
+		}
+	}
+
+	return toggleVSCode, toggleGoogle, toggleComposer
 }
 
 func getButtons(window fyne.Window, wg *sync.WaitGroup) (ButtonRight *fyne.Container, ButtonLeft *fyne.Container) {
-	buttonVSCode := widget.NewButton("Download", func() {
-		if !hasVSCode {
-			dst := downloadPath + "/vscode_installer.exe"
-			wg.Add(1)
-			go utils.DownloadFileAndRun(utils.VscodeUrl, dst, progressBar, window, wg)
-		} else {
-			dialog.ShowInformation("VSCode", "VSCode is already installed!", window)
-		}
-	})
-	buttonVSCode.Importance = widget.HighImportance
+	// Toggles
+	toggleVSCode, toggleGoogle, toggleComposer := getToggles()
 
-	buttonGoogle := widget.NewButton("Download", func() {
-		if !hasGoogle {
-			dst := downloadPath + "/chrome_installer.exe"
-			wg.Add(1)
-			go utils.DownloadFileAndRun(utils.ChromeUrl, dst, progressBar, window, wg)
-		} else {
-			dialog.ShowInformation("Google Chrome", "Google Chrome is already installed!", window)
-		}
-	})
-	buttonGoogle.Importance = widget.HighImportance
+	buttonVSCode := utils.CreateButton(
+		"", utils.VscodeUrl, hasVSCode, downloadPath+"/vscode_installer.exe", progressBar, window, wg,
+	)
 
-	buttonContainerRight := container.New(layout.NewGridWrapLayout(buttonScale), buttonVSCode)
-	buttonContainerLeft := container.New(layout.NewGridWrapLayout(buttonScale), buttonGoogle)
+	buttonGoogle := utils.CreateButton(
+		"", utils.ChromeUrl, hasGoogle, downloadPath+"/chrome_installer.exe", progressBar, window, wg,
+	)
+
+	buttonComposer := utils.CreateButton(
+		"", utils.ComposerUrl, hasComposer, downloadPath+"/composer_installer.exe", progressBar, window, wg,
+	)
+
+	buttonContainerRight := container.New(layout.NewGridWrapLayout(buttonScale))
+	buttonContainerLeft := container.New(layout.NewGridLayoutWithColumns(1),
+		container.NewHBox(
+			toggleVSCode,
+			layout.NewSpacer(),
+			buttonVSCode,
+		),
+		container.NewHBox(
+			toggleGoogle,
+			layout.NewSpacer(),
+			buttonGoogle,
+		),
+		container.NewHBox(
+			toggleComposer,
+			layout.NewSpacer(),
+			buttonComposer,
+		),
+	)
 
 	return buttonContainerRight, buttonContainerLeft
 }
@@ -147,9 +171,6 @@ func main() {
 		),
 	)
 
-	// Toggles
-	toggleVSCode, toggleGoogle := getToggles()
-
 	// Search Bar
 	searchBar := widget.NewEntry()
 	searchBar.SetPlaceHolder("Search...")
@@ -177,7 +198,6 @@ func main() {
 		nil,
 		nil,
 		container.NewVBox(
-			toggleVSCode,
 			buttonContainerRight,
 		),
 		nil,
@@ -186,24 +206,24 @@ func main() {
 		nil,
 		nil,
 		container.NewVBox(
-			toggleGoogle,
 			buttonContainerLeft,
 		),
 		nil,
 	)
 
+	// Main Content
+	mainContent := container.NewHSplit(mainContentLeft, mainContentRight)
+	mainContent.SetOffset(0.2)
+
 	// Content
-	content := container.NewBorder(
-		container.NewCenter(searchBarContainer),
-		nil,
-		nil,
-		nil,
-		background,
+	content := container.NewVScroll(
 		container.NewBorder(
-			progressBar,
-			hyperlinkContainer,
-			mainContentLeft,
-			mainContentRight,
+			searchBarContainer,
+			container.NewVBox(progressBar, hyperlinkContainer),
+			nil,
+			nil,
+			background,
+			mainContent,
 		),
 	)
 
