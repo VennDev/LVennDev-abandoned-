@@ -3,7 +3,6 @@ package main
 import (
 	"net/url"
 	"os"
-	"strconv"
 	"sync"
 
 	"fyne.io/fyne/v2"
@@ -13,6 +12,7 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
+	"github.com/venndev/LVennDev/src/venndev/lvenndev/compons"
 	"github.com/venndev/LVennDev/src/venndev/lvenndev/theme"
 	"github.com/venndev/LVennDev/src/venndev/lvenndev/utils"
 )
@@ -96,9 +96,23 @@ func main() {
 
 	// Check if VSCode is installed
 	hasVSCode = utils.CheckVSCode()
+	toggleVSCode := compons.NewCustomCheck("VSCode", nil)
+	toggleVSCode.SetChecked(hasVSCode)
+	toggleVSCode.OnChanged = func(checked bool) {
+		if checked {
+			toggleVSCode.Enable()
+		}
+	}
 
 	// Check if Google Chrome is installed
 	hasGoogle = utils.CheckGoogleHasDownloaded()
+	toggleGoogle := compons.NewCustomCheck("Google Chrome", nil)
+	toggleGoogle.SetChecked(hasGoogle)
+	toggleGoogle.OnChanged = func(checked bool) {
+		if checked {
+			toggleGoogle.Enable()
+		}
+	}
 
 	// Search Bar
 	searchBar := widget.NewEntry()
@@ -106,28 +120,22 @@ func main() {
 	searchBarContainer := container.NewGridWrap(fyne.NewSize(200, 40), searchBar)
 
 	// Buttons
-	labelVSCode := widget.NewLabel("VSCode: " + strconv.FormatBool(hasVSCode))
-	labelVSCode.Alignment = fyne.TextAlignCenter
-	labelVSCode.TextStyle = fyne.TextStyle{Bold: true}
 	buttonVSCode := widget.NewButton("Download", func() {
 		if !hasVSCode {
 			dst := downloadPath + "/vscode_installer.exe"
 			wg.Add(1)
-			go utils.DownloadFileAndRun(utils.ChromeUrl, dst, progressBar, myWindow, &wg)
+			go utils.DownloadFileAndRun(utils.VscodeUrl, dst, progressBar, myWindow, &wg)
 		} else {
 			dialog.ShowInformation("VSCode", "VSCode is already installed!", myWindow)
 		}
 	})
 	buttonVSCode.Importance = widget.HighImportance
 
-	labelGoogle := widget.NewLabel("Google Chrome: " + strconv.FormatBool(hasGoogle))
-	labelGoogle.Alignment = fyne.TextAlignCenter
-	labelGoogle.TextStyle = fyne.TextStyle{Bold: true}
 	buttonGoogle := widget.NewButton("Download", func() {
 		if !hasGoogle {
 			dst := downloadPath + "/chrome_installer.exe"
 			wg.Add(1)
-			go utils.DownloadFileAndRun(utils.VscodeUrl, dst, progressBar, myWindow, &wg)
+			go utils.DownloadFileAndRun(utils.ChromeUrl, dst, progressBar, myWindow, &wg)
 		} else {
 			dialog.ShowInformation("Google Chrome", "Google Chrome is already installed!", myWindow)
 		}
@@ -152,12 +160,12 @@ func main() {
 	background.SetMinSize(fyne.NewSize(1000, 600))
 
 	// Main Content
-	mainContentRight := container.NewHBox(
-		labelVSCode,
+	mainContentRight := container.NewVBox(
+		toggleVSCode,
 		buttonContainerRight,
 	)
-	mainContentLeft := container.NewHBox(
-		labelGoogle,
+	mainContentLeft := container.NewVBox(
+		toggleGoogle,
 		buttonContainerLeft,
 	)
 
